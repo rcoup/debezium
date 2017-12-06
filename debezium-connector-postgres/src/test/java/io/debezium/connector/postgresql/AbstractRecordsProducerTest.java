@@ -95,6 +95,11 @@ public abstract class AbstractRecordsProducerTest {
     protected static final String INSERT_ARRAY_TYPES_WITH_NULL_VALUES_STMT = "INSERT INTO array_table_with_nulls (int_array, bigint_array, text_array) " +
             "VALUES (null, null, null)";
 
+    protected static final String INSERT_POSTGIS_TYPES_STMT = "INSERT INTO postgis_table (p, ml, b) " + // (p, ml, ga, b) " +
+            "VALUES ('SRID=4326;POINT(174.9479 -36.7208)'::postgis.geometry, 'MULTILINESTRING((169.1321 -44.7032, 167.8974 -44.6414))'::postgis.geography, " +
+            //"ARRAY['GEOMETRYCOLLECTION EMPTY'::postgis.geometry, 'POLYGON((166.51 -46.64, 178.52 -46.64, 178.52 -34.45, 166.51 -34.45, 166.51 -46.64))'::postgis.geometry]::postgis.geometry[], " +
+            "'BOX3D(1 2 3,5 6 5)'::postgis.box3d)";
+
     protected static final String INSERT_QUOTED_TYPES_STMT = "INSERT INTO \"Quoted_\"\" . Schema\".\"Quoted_\"\" . Table\" (\"Quoted_\"\" . Text_Column\") " +
                                                              "VALUES ('some text')";
 
@@ -102,7 +107,8 @@ public abstract class AbstractRecordsProducerTest {
                                                                  INSERT_DATE_TIME_TYPES_STMT,
                                                                  INSERT_BIN_TYPES_STMT, INSERT_GEOM_TYPES_STMT, INSERT_TEXT_TYPES_STMT,
                                                                  INSERT_CASH_TYPES_STMT, INSERT_STRING_TYPES_STMT, INSERT_ARRAY_TYPES_STMT,
-                                                                 INSERT_ARRAY_TYPES_WITH_NULL_VALUES_STMT, INSERT_QUOTED_TYPES_STMT));
+                                                                 INSERT_ARRAY_TYPES_WITH_NULL_VALUES_STMT, INSERT_QUOTED_TYPES_STMT,
+                                                                 INSERT_POSTGIS_TYPES_STMT));
 
     protected List<SchemaAndValueField> schemasAndValuesForNumericType() {
         return Arrays.asList(new SchemaAndValueField("si", SchemaBuilder.OPTIONAL_INT16_SCHEMA, (short) 1),
@@ -242,6 +248,16 @@ public abstract class AbstractRecordsProducerTest {
         );
     }
 
+    protected List<SchemaAndValueField> schemaAndValuesForPostgisTypes() {
+        return Arrays.asList(
+                // geometries are encoded here as HexEWKB
+                new SchemaAndValueField("p", Schema.OPTIONAL_STRING_SCHEMA, "0101000020E61000001C7C613255DE6540787AA52C435C42C0"),
+                new SchemaAndValueField("ml", Schema.OPTIONAL_STRING_SCHEMA, "0105000020E610000001000000010200000002000000A779C7293A2465400B462575025A46C0C66D3480B7FC6440C3D32B65195246C0"),
+                //new SchemaAndValueField("ga", SchemaBuilder.array(Schema.OPTIONAL_STRING_SCHEMA).optional().build(), Arrays.asList("010700000000000000", "01030000000100000005000000B81E85EB51D0644052B81E85EB5147C0713D0AD7A350664052B81E85EB5147C0713D0AD7A35066409A999999993941C0B81E85EB51D064409A999999993941C0B81E85EB51D0644052B81E85EB5147C0")),
+                new SchemaAndValueField("b", Schema.OPTIONAL_STRING_SCHEMA, "BOX3D(1 2 3,5 6 5)")
+        );
+    }
+
     protected List<SchemaAndValueField> schemasAndValuesForQuotedTypes() {
        return Arrays.asList(new SchemaAndValueField("Quoted_\" . Text_Column", Schema.OPTIONAL_STRING_SCHEMA, "some text"));
     }
@@ -285,6 +301,8 @@ public abstract class AbstractRecordsProducerTest {
                 return schemasAndValuesForArrayTypes();
             case INSERT_ARRAY_TYPES_WITH_NULL_VALUES_STMT:
                 return schemasAndValuesForArrayTypesWithNullValues();
+            case INSERT_POSTGIS_TYPES_STMT:
+                return schemaAndValuesForPostgisTypes();
             case INSERT_QUOTED_TYPES_STMT:
                 return schemasAndValuesForQuotedTypes();
             default:

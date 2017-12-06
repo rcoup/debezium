@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.postgresql.geometric.PGpoint;
 import org.postgresql.jdbc.PgArray;
 import org.slf4j.Logger;
@@ -25,6 +27,7 @@ import io.debezium.connector.postgresql.PostgresValueConverter;
 import io.debezium.connector.postgresql.RecordsStreamProducer.PgConnectionSupplier;
 import io.debezium.connector.postgresql.connection.ReplicationMessage;
 import io.debezium.connector.postgresql.proto.PgProto;
+import io.debezium.relational.TableId;
 
 /**
  * Replication message representing message sent by <a href="https://github.com/debezium/postgres-decoderbufs">Postgres Decoderbufs</>
@@ -219,9 +222,21 @@ class PgProtoReplicationMessage implements ReplicationMessage {
                     LOGGER.warn("Unexpected exception trying to process PgArray column '{}'", datumMessage.getColumnName(), e);
                 }
                 return null;
-            default: {
+
+            case PgOid.UNSPECIFIED:
                 return null;
-            }
+
+            default:
+                try {
+                    String typeName = TableId.parse(connection.get().getTypeInfo().getPGType(columnType)).table();
+                    if (PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName)) {
+                        return datumMessage.hasDatumString() ? datumMessage.getDatumString() : null;
+                    }
+                    return null;
+                } catch (SQLException e) {
+                    LOGGER.warn("Unexpected exception trying to process unknown column '{}' (type {})", datumMessage.getColumnName(), columnType, e);
+                }
+                return null;
         }
     }
 }

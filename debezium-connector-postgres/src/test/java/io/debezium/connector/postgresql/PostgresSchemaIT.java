@@ -106,6 +106,21 @@ public class PostgresSchemaIT {
         }
     }
 
+    public void shouldLoadSchemaForPostgisTypes() throws Exception {
+        TestHelper.executeDDL("postgis_create_tables.ddl");
+        schema = new PostgresSchema(new PostgresConnectorConfig(TestHelper.defaultConfig().build()));
+        try (PostgresConnection connection = TestHelper.create()) {
+            schema.refresh(connection, false);
+            final String[] testTables = new String[] {"postgis.spatial_ref_sys", "postgis.postgis_table"};
+            assertTablesIncluded(testTables);
+            Arrays.stream(testTables).forEach(tableId -> assertKeySchema(tableId, "pk", Schema.INT32_SCHEMA));
+
+            assertTableSchema("public.postgis_table", "p, ml, ga, b",
+                              Schema.OPTIONAL_STRING_SCHEMA, Schema.OPTIONAL_STRING_SCHEMA,
+                              SchemaBuilder.array(Schema.OPTIONAL_STRING_SCHEMA).optional().build(), Schema.OPTIONAL_STRING_SCHEMA);
+        }
+    }
+
     @Test
     public void shouldApplyFilters() throws Exception {
         String statements = "CREATE SCHEMA s1; " +

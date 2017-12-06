@@ -26,6 +26,7 @@ import org.postgresql.geometric.PGpolygon;
 import org.postgresql.jdbc.PgArray;
 import org.postgresql.util.PGInterval;
 import org.postgresql.util.PGmoney;
+import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ import io.debezium.util.Strings;
 class Wal2JsonReplicationMessage implements ReplicationMessage {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Wal2JsonReplicationMessage.class);
-    private static final Pattern TYPE_PATTERN = Pattern.compile("^(?<full>(?<base>[^(\\[]+)(?:\\((?<mod>.+)\\))?(?<suffix>.*?))(?<array>\\[\\])?$");
+    private static final Pattern TYPE_PATTERN = Pattern.compile("^(?<schema>[^\\.\\(]+\\.)?(?<full>(?<base>[^(\\[]+)(?:\\((?<mod>.+)\\))?(?<suffix>.*?))(?<array>\\[\\])?$");
 
     private final int txId;
     private final long commitTime;
@@ -183,8 +184,13 @@ class Wal2JsonReplicationMessage implements ReplicationMessage {
             try {
                 final String dataString = rawValue.asString();
                 PgArray arrayData = new PgArray(connection.get(), connection.get().getTypeInfo().getPGArrayType(fullType), dataString);
-                Object deserializedArray = arrayData.getArray();
+                Object[] deserializedArray = (Object[])arrayData.getArray();
                 // TODO: what types are these? Shouldn't they pass through this function again?
+                for (int i=0; i<deserializedArray.length; i++) {
+                    if (deserializedArray[i] instanceof PGobject) {
+                        deserializedArray[i] = ((PGobject)deserializedArray[i]).getValue();
+                    }
+                }
                 return Arrays.asList((Object[])deserializedArray);
             }
             catch (SQLException e) {
@@ -327,6 +333,13 @@ class Wal2JsonReplicationMessage implements ReplicationMessage {
                     throw new ConnectException(e);
                 }
 
+            case "geometry":
+            case "geography":
+            case "box3d":
+            case "box2d":
+                // PostGIS types end up as HexEWKB strings anyway
+                return rawValue.asString();
+
             case "bit":
             case "bit varying":
             case "varbit":
@@ -351,6 +364,7 @@ class Wal2JsonReplicationMessage implements ReplicationMessage {
                 break;
         }
 
+        LOGGER.debug("Unknown column type {} for column {} – ignoring", columnType, columnName);
         return null;
     }
 }

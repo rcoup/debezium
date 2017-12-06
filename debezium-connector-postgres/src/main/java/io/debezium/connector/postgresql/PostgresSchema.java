@@ -167,7 +167,12 @@ public class PostgresSchema {
     }
 
     protected int columnTypeNameToPgOid(String localTypeName) {
-        return typeInfo.get(localTypeName);
+        String typeName = TableId.parse(localTypeName).table();  // type names here can be '"scheme"."type"'
+        Integer oid = typeInfo.get(typeName);
+        if (oid == null || oid == 0 || oid == PgOid.UNSPECIFIED) {
+            LOGGER.warn("columnTypeNameToPgOid: {} ({}) => {}", localTypeName, typeName, oid);
+        }
+        return oid;
     }
 
     protected Stream<TableId> tables() {

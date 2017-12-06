@@ -7,6 +7,9 @@
 package io.debezium.connector.postgresql;
 
 import java.sql.Types;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.postgresql.core.Oid;
 import org.postgresql.util.PSQLException;
@@ -32,6 +35,15 @@ public final class PgOid extends Oid {
     public static final int JSONB_OID = 3802;
 
     public static final int TSTZRANGE_OID = 3910;
+
+    /**
+     * Types defined by the PostGIS extension
+     */
+    protected static final String[] POSTGIS_TYPES = {"geometry", "geography", "box2d", "box3d"};
+    /**
+     * Additional Postgres type names to treat as strings in value conversion
+     */
+    public static final Set<String> ADDITIONAL_STRING_TYPE_NAMES = new HashSet<>(Arrays.asList(POSTGIS_TYPES));
 
     private PgOid() {
     }

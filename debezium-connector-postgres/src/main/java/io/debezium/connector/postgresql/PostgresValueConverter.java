@@ -15,9 +15,12 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Decimal;
@@ -37,6 +40,7 @@ import io.debezium.data.geometry.Point;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.Column;
+import io.debezium.relational.TableId;
 import io.debezium.relational.ValueConverter;
 import io.debezium.time.MicroDuration;
 import io.debezium.time.ZonedTime;
@@ -144,9 +148,24 @@ public class PostgresValueConverter extends JdbcValueConverters {
                 // These array types still need to be implemented.  The superclass won't handle them so
                 // we return null here until we can code schema implementations for them.
                 return null;
+
+            case PgOid.UNSPECIFIED:
+                // column types here can be '"schema"."type"' too...
+                TableId unqualifiedType = TableId.parse(column.typeName());
+                String typeName = unqualifiedType.table();
+                if (PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName)) {
+                    return SchemaBuilder.string();
+                } else if ((typeName.endsWith("[]") && PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName.substring(0, typeName.length()-2)))
+                        || (typeName.startsWith("_") && PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName.substring(1)))) {
+                    // matching array types
+                    return SchemaBuilder.array(Schema.OPTIONAL_STRING_SCHEMA);
+                }
+                return null;
+
             default:
                 return super.schemaBuilder(column);
         }
+
     }
 
     private SchemaBuilder numericSchema(final Column column) {
@@ -225,6 +244,20 @@ public class PostgresValueConverter extends JdbcValueConverters {
             case PgOid.JSON_ARRAY:
             case PgOid.REF_CURSOR_ARRAY:
                 return super.converter(column, fieldDefn);
+
+            case PgOid.UNSPECIFIED:
+                // column types here can be '"schema"."type"' too...
+                TableId unqualifiedType = TableId.parse(column.typeName());
+                String typeName = unqualifiedType.table();
+                if (PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName)) {
+                    return data -> convertString(column, fieldDefn, data);
+                } else if ((typeName.endsWith("[]") && PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName.substring(0, typeName.length()-2)))
+                        || (typeName.startsWith("_") && PgOid.ADDITIONAL_STRING_TYPE_NAMES.contains(typeName.substring(1)))) {
+                    // matching array types
+                    return data -> convertArray(column, fieldDefn, data);
+                }
+                return super.converter(column, fieldDefn);
+
             default:
                 return super.converter(column, fieldDefn);
         }
